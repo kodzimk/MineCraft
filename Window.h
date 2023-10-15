@@ -12,6 +12,9 @@ public:
 	bool release();
 	bool isRun();
 
+	RECT getClientWindowRect();
+	void setHWND(HWND hwnd);
+
 	virtual void onCreate() ;
 	virtual void onUpdate() ;
 	virtual void onDestroy();
@@ -19,7 +22,7 @@ public:
 	~Window();
 
 
-private:
+protected:
 	HWND m_hand;
 	bool m_is_run;
 
