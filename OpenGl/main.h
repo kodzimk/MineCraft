@@ -71,6 +71,10 @@ namespace camera
 	}
 }
 
+float sun[] = {
+	-1,-1,0, 1,-1,0,1,1,0,-1,1,0
+};
+
 typedef struct
 {
 	float x, y, z;

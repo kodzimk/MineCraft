@@ -199,7 +199,7 @@ void Map_Init()
 		{
 			map[i][j].x = i;
 			map[i][j].y = j;
-			map[i][j].z = (rand() % 10) * 0.05;
+			map[i][j].z = (rand() % 10) * 0.02;
 
 			mapUV[i][j].u = i;
 			mapUV[i][j].v = j;
@@ -287,18 +287,57 @@ void Player_Move()
 
 void Map_Show()
 {
+	static float alfa = 0;
+	alfa += 0.3;
+	if (alfa > 180)alfa -= 360;
+#define abs(a) ((a) >0?(a) : -(a))
+	float kcc = 1 - (abs(alfa) / 180);
+#define sakat 40.0
+	float k = 90 - abs(alfa);
+	k = (sakat - abs(k));
+	k = k < 0 ? 0 : k / sakat;
 
-	glClearColor(0.6f, 0.8f, 1.0f, 0.0f);
+	glClearColor(0.6f*kcc, 0.8f*kcc, 1.0f*kcc, 0.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	glEnable(GL_TEXTURE_2D);
 
 	glPushMatrix();
+	    glPushMatrix();
+	glRotatef(-camera::camera.XRot, 1, 0, 0);
+	glRotatef(-camera::camera.ZRot, 0, 0, 1);
+	glRotatef(alfa, 0, 1, 0);
+	glTranslatef(0, 0, 20);
+	glDisable(GL_DEPTH_TEST);
+
+	glDisable(GL_TEXTURE_2D);
+	glColor3f(1, 1- k*0.8, 1 - k);
+	glEnableClientState(GL_VERTEX_ARRAY);
+	glVertexPointer(3, GL_FLOAT, 0, sun);
+	glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+	glDisableClientState(GL_VERTEX_ARRAY);
+	glEnable(GL_TEXTURE_2D);
+	glEnable(GL_DEPTH_TEST);
+     	glPopMatrix();
+
+
 	Player_Move();
 	camera::Camera_Apply();
 
-	GLfloat position[] = { 1,0,2,0 };
+
+	glPushMatrix();
+	glRotatef(alfa, 0, 1, 0);
+	GLfloat position[] = { 0,0,1,0 };
 	glLightfv(GL_LIGHT0, GL_POSITION, position);
+	float mas[] = { 1 + k * 2,1,1,0 };
+	glLightfv(GL_LIGHT0, GL_DIFFUSE, mas);
+
+	float clr = kcc * 0.15 + 0.05;
+	float mas0[] = {
+      clr,clr,clr,0
+	};
+	glLightModelfv(GL_LIGHT_MODEL_AMBIENT, mas0);
+	glPopMatrix();
 
 	glEnableClientState(GL_VERTEX_ARRAY);
 	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
