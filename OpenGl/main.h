@@ -172,6 +172,8 @@ int plantCnt = 0;
 int tex_wood;
 
 BOOL mouseBind = TRUE;
+int handItemType = 0;
+POINT mousePos;
 
 float cube[] = {
 	0,0,0, 1,0,0, 1,1,0, 0,1,0,

@@ -213,19 +213,26 @@ void Anim_Move(TAnim* anim)
 	}
 }
 
-void Bag_Click(int x, int y, int scale, int mx, int my)
+void Bag_Click(int x, int y, int scale, int mx, int my,int button)
 {
 	if ((my < y) || (my > y + scale))return;
 	for (int i = 0; i < bagSize; i++)
 	{
 		if ((mx > x + i * scale) && (mx < x + (i + 1) * scale)) {
-			if (bag[i].type == tex_grib)
+			if (button == WM_LBUTTONDOWN)
+			{
+				int type = handItemType;
+				handItemType = bag[i].type;
+				bag[i].type = type;
+			}
+			if (bag[i].type == tex_grib&&button!=WM_LBUTTONDOWN)
 			{
 				health++;
 				if (health > healthMax)health = healthMax;
+				bag[i].type = -1;
 
 			}
-			bag[i].type = -1;
+		
 		}
 	}
 }
@@ -248,26 +255,26 @@ void Health_Show(int x, int y, int scale)
 	glDisableClientState(GL_VERTEX_ARRAY);
 }
 
-void Bag_Show(int x,int y,int scale)
+
+
+void Cell_Show(int x,int y,int scaleX,int scaleY,int type)
 {
 	glEnableClientState(GL_VERTEX_ARRAY);
 	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
 	glVertexPointer(2, GL_FLOAT, 0, bagRect);
 	glTexCoordPointer(2, GL_FLOAT, 0, bagRectUV);
-	for (int i = 0; i < bagSize; i++)
-	{
 		glPushMatrix();
-		glTranslatef(x + i * scale, y, 0);
-		glScalef(scale, scale, 1);
+		glTranslatef(x , y, 0);
+		glScalef(scaleX, scaleY, 1);
 		glColor3f(0, 0, 0);
 		glDisable(GL_TEXTURE_2D);
 		glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 
-		if (bag[i].type > 0)
+		if (type > 0)
 		{
 			glColor3f(1, 1, 1);
 			glEnable(GL_TEXTURE_2D);
-			glBindTexture(GL_TEXTURE_2D, bag[i].type);
+			glBindTexture(GL_TEXTURE_2D, type);
 			glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 		}
 
@@ -276,9 +283,38 @@ void Bag_Show(int x,int y,int scale)
 		glDisable(GL_TEXTURE_2D);
 		glDrawArrays(GL_LINE_LOOP, 0, 4);
 		glPopMatrix();  
-	}
+	
 	glDisableClientState(GL_VERTEX_ARRAY);
 	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+}
+
+void HandIyem_Show()
+{
+	if ((handItemType > 0)&&(!mouseBind))
+		Cell_Show(mousePos.x, mousePos.y, 50, 50, handItemType);
+}
+
+void Bag_Show(int x, int y, int scale)
+{
+	for (int i = 0; i < bagSize; i++)
+	{
+		Cell_Show(x + i * scale, y, scale, scale, bag[i].type);
+	}
+}
+
+void Cross_Show()
+{
+	static float cross[] = { 0,-1,0,1,-1,0,1,0 };
+	glEnableClientState(GL_VERTEX_ARRAY);
+	glVertexPointer(2, GL_FLOAT, 0, cross);
+	glPushMatrix();
+	glColor3f(1, 1, 1);
+	glTranslatef(scrSize.x * 0.5, scrSize.y * 0.5, 0);
+	glScalef(15, 15, 1);
+	glLineWidth(1);
+	glDrawArrays(GL_LINES, 0, 4);
+	glPopMatrix();
+	glDisableClientState(GL_VERTEX_ARRAY);
 }
 
 void Map_Init()
@@ -424,6 +460,19 @@ void Player_Take(HWND hwnd)
 
 }
 
+void Map_Proc()
+{
+	static int hunger = 0;
+	hunger++;
+	if (hunger > 200)
+	{
+		hunger = 0;
+		health--;
+		if (health < 1)
+			PostQuitMessage(0);
+	}
+}
+
 void Map_Show()
 {
 	float sz = 0.1;
@@ -435,6 +484,9 @@ void Map_Show()
 	glLoadIdentity();
 
 	glEnable(GL_DEPTH_TEST);
+
+	
+
 
 	static float alfa = 0;
 	alfa += 0.03;
@@ -601,6 +653,8 @@ void Menu_Show()
 
 	Bag_Show(10,10,50);
 	Health_Show(10,70,30);
+	Cross_Show();
+	HandIyem_Show();
 }
 
 int WINAPI WinMain(HINSTANCE hInstance,
@@ -677,7 +731,10 @@ int WINAPI WinMain(HINSTANCE hInstance,
 		}
 		else
 		{
-			
+			GetCursorPos(&mousePos);
+			ScreenToClient(hwnd, &mousePos);
+
+			Map_Proc();
 			Map_Show();
 			Menu_Show();
 
@@ -704,10 +761,11 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		PostQuitMessage(0);
 		break;
 	case WM_LBUTTONDOWN:
+	case WM_RBUTTONDOWN:
 		if (mouseBind)
 			Player_Take(hwnd);
 		else
-			Bag_Click(10, 10, 50, LOWORD(lParam), HIWORD(lParam));
+			Bag_Click(10, 10, 50, LOWORD(lParam), HIWORD(lParam),uMsg);
 		break;
 
 	case WM_SETCURSOR:
@@ -728,6 +786,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			break;
 		case 'E':
 			mouseBind = !mouseBind;
+			SetCursorPos(400, 400);
 			if (mouseBind)
 				while (ShowCursor(FALSE) >= 0);
 			else
