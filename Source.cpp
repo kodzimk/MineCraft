@@ -173,8 +173,120 @@ void Tree_Show(TobjGroup obj)
 
 
 
+void Anim_Set(TAnim* anim, TObject* obj)
+{
+	if (anim->obj != NULL)return;
+	anim->obj = obj;
+	anim->cnt = 10;
+	anim->dx = (camera::camera.x - obj->x) / (float)anim->cnt;
+	anim->dy = (camera::camera.y - obj->y) / (float)anim->cnt;
+	anim->dz = ((camera::camera.z - obj->scale - 0.2) - obj->z) / (float)anim->cnt;
+}
+
+
+void Anim_Move(TAnim* anim)
+{
+	if (anim->obj != NULL)
+	{
+		anim->obj->x += anim->dx;
+		anim->obj->y += anim->dy;
+		anim->obj->z += anim->dz;
+		anim->cnt--;
+		if (anim->cnt < 1)
+		{
+			int i;
+			for ( i = 0; i < bagSize; i++)
+			{
+				if (bag[i].type < 0) {
+					bag[i].type = anim->obj->type;
+					break;
+				}
+			}
+			if (i < bagSize)
+			{
+				anim->obj->x = rand() % mapW;
+				anim->obj->y = rand() % mapH;
+			}
+			anim->obj->z = Map_GetHeight(anim->obj->x, anim->obj->y);
+			anim->obj = NULL;
+		}
+	}
+}
+
+void Bag_Click(int x, int y, int scale, int mx, int my)
+{
+	if ((my < y) || (my > y + scale))return;
+	for (int i = 0; i < bagSize; i++)
+	{
+		if ((mx > x + i * scale) && (mx < x + (i + 1) * scale)) {
+			if (bag[i].type == tex_grib)
+			{
+				health++;
+				if (health > healthMax)health = healthMax;
+
+			}
+			bag[i].type = -1;
+		}
+	}
+}
+
+void Health_Show(int x, int y, int scale)
+{
+	glDisable(GL_TEXTURE_2D);
+	glEnableClientState(GL_VERTEX_ARRAY);
+	glVertexPointer(2, GL_FLOAT, 0, heart);
+	for (int i = 0; i < healthMax; i++)
+	{
+		glPushMatrix();
+		glTranslatef(x + i * scale, y, 0);
+		glScalef(scale, scale, 1);
+		if (i < health)glColor3f(1, 0, 0);
+		else glColor3f(0, 0, 0);
+		glDrawArrays(GL_TRIANGLE_FAN, 0, 6);
+		glPopMatrix();
+	}
+	glDisableClientState(GL_VERTEX_ARRAY);
+}
+
+void Bag_Show(int x,int y,int scale)
+{
+	glEnableClientState(GL_VERTEX_ARRAY);
+	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+	glVertexPointer(2, GL_FLOAT, 0, bagRect);
+	glTexCoordPointer(2, GL_FLOAT, 0, bagRectUV);
+	for (int i = 0; i < bagSize; i++)
+	{
+		glPushMatrix();
+		glTranslatef(x + i * scale, y, 0);
+		glScalef(scale, scale, 1);
+		glColor3f(0, 0, 0);
+		glDisable(GL_TEXTURE_2D);
+		glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+
+		if (bag[i].type > 0)
+		{
+			glColor3f(1, 1, 1);
+			glEnable(GL_TEXTURE_2D);
+			glBindTexture(GL_TEXTURE_2D, bag[i].type);
+			glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+		}
+
+		glColor3ub(160, 146, 116);
+		glLineWidth(3);
+		glDisable(GL_TEXTURE_2D);
+		glDrawArrays(GL_LINE_LOOP, 0, 4);
+		glPopMatrix();  
+	}
+	glDisableClientState(GL_VERTEX_ARRAY);
+	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+}
+
 void Map_Init()
 {
+	for (int i = 0; i < bagSize; i++)
+	{
+		bag[i].type = -1;
+	}
 
 	LoadTexture("textures/pole.png", &tex_pole);
 	LoadTexture("textures/trava.png", &tex_trava);
@@ -281,14 +393,51 @@ void Player_Move()
 		GetKeyState('W') < 0 ? 1 : (GetKeyState('S') < 0 ? -1 : 0),
 		GetKeyState('D')<0?1:(GetKeyState('A')<0?-1:0),
 		0.1);
-	camera::Camera_AutoMoveByMouse(400, 400, 0.2);
+	if(mouseBind)
+     	camera::Camera_AutoMoveByMouse(400, 400, 0.2);
 	camera::camera.z = Map_GetHeight(camera::camera.x, camera::camera.y)+1.7;
+}
+
+
+void Map_Show();
+
+void Player_Take(HWND hwnd)
+{
+	selectMode = TRUE;
+	Map_Show();
+	selectMode = FALSE;
+	RECT rct;
+	GLubyte clr[3];
+	GetClientRect(hwnd, &rct);
+	glReadPixels(rct.right / 2.0, rct.bottom / 2.0, 1, 1, GL_RGB,
+		GL_UNSIGNED_BYTE, clr);
+
+	if (clr[0] > 0)
+	{
+		for (int i = 0; i < selectMasCnt; i++)
+		{
+			if (selectMas[i].colorIndex == clr[0]) {
+				Anim_Set(&animation, plantMas + selectMas[i].plantMas_Index);
+			}
+		}
+	}
+
 }
 
 void Map_Show()
 {
+	float sz = 0.1;
+
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	glFrustum(-scrKoef * sz, scrKoef * sz, -sz, sz, sz * 2, 1000);
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+
+	glEnable(GL_DEPTH_TEST);
+
 	static float alfa = 0;
-	alfa += 0.3;
+	alfa += 0.03;
 	if (alfa > 180)alfa -= 360;
 #define abs(a) ((a) >0?(a) : -(a))
 	float kcc = 1 - (abs(alfa) / 180);
@@ -297,28 +446,44 @@ void Map_Show()
 	k = (sakat - abs(k));
 	k = k < 0 ? 0 : k / sakat;
 
-	glClearColor(0.6f*kcc, 0.8f*kcc, 1.0f*kcc, 0.0f);
+	if (selectMode)glClearColor(0, 0, 0, 0);
+	else glClearColor(0.6f * kcc, 0.8f * kcc, 1.0f * kcc, 0.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	glEnable(GL_TEXTURE_2D);
+	if (selectMode)
+	{
+		glDisable(GL_TEXTURE_2D);
+		glDisable(GL_LIGHTING);
+	}
+	else
+	{
+		glEnable(GL_LIGHTING);
+		glEnable(GL_TEXTURE_2D);
+	}
+
+	Anim_Move(&animation);
+
 
 	glPushMatrix();
-	    glPushMatrix();
-	glRotatef(-camera::camera.XRot, 1, 0, 0);
-	glRotatef(-camera::camera.ZRot, 0, 0, 1);
-	glRotatef(alfa, 0, 1, 0);
-	glTranslatef(0, 0, 20);
-	glDisable(GL_DEPTH_TEST);
+	if (!selectMode)
+	{
+		glPushMatrix();
+		glRotatef(-camera::camera.XRot, 1, 0, 0);
+		glRotatef(-camera::camera.ZRot, 0, 0, 1);
+		glRotatef(alfa, 0, 1, 0);
+		glTranslatef(0, 0, 20);
+		glDisable(GL_DEPTH_TEST);
 
-	glDisable(GL_TEXTURE_2D);
-	glColor3f(1, 1- k*0.8, 1 - k);
-	glEnableClientState(GL_VERTEX_ARRAY);
-	glVertexPointer(3, GL_FLOAT, 0, sun);
-	glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-	glDisableClientState(GL_VERTEX_ARRAY);
-	glEnable(GL_TEXTURE_2D);
-	glEnable(GL_DEPTH_TEST);
-     	glPopMatrix();
+		glDisable(GL_TEXTURE_2D);
+		glColor3f(1, 1 - k * 0.8, 1 - k);
+		glEnableClientState(GL_VERTEX_ARRAY);
+		glVertexPointer(3, GL_FLOAT, 0, sun);
+		glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+		glDisableClientState(GL_VERTEX_ARRAY);
+		glEnable(GL_TEXTURE_2D);
+		glEnable(GL_DEPTH_TEST);
+		glPopMatrix();
+	}
 
 
 	Player_Move();
@@ -339,18 +504,21 @@ void Map_Show()
 	glLightModelfv(GL_LIGHT_MODEL_AMBIENT, mas0);
 	glPopMatrix();
 
-	glEnableClientState(GL_VERTEX_ARRAY);
-	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-	glEnableClientState(GL_NORMAL_ARRAY);
-    	glVertexPointer(3, GL_FLOAT, 0, map);
+	if (!selectMode)
+	{
+		glEnableClientState(GL_VERTEX_ARRAY);
+		glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+		glEnableClientState(GL_NORMAL_ARRAY);
+		glVertexPointer(3, GL_FLOAT, 0, map);
 		glTexCoordPointer(2, GL_FLOAT, 0, mapUV);
-			glColor3f(0.7, 0.7, 0.7);
-	    glNormalPointer(GL_FLOAT, 0, mapNormal);
+		glColor3f(0.7, 0.7, 0.7);
+		glNormalPointer(GL_FLOAT, 0, mapNormal);
 		glBindTexture(GL_TEXTURE_2D, tex_pole);
-	glDrawElements(GL_TRIANGLES, mapIndCount, GL_UNSIGNED_INT, mapind);
-	glDisableClientState(GL_VERTEX_ARRAY);
-	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-	glDisableClientState(GL_NORMAL_ARRAY);
+		glDrawElements(GL_TRIANGLES, mapIndCount, GL_UNSIGNED_INT, mapind);
+		glDisableClientState(GL_VERTEX_ARRAY);
+		glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+		glDisableClientState(GL_NORMAL_ARRAY);
+	}
 	
 
 	glEnableClientState(GL_VERTEX_ARRAY);
@@ -359,22 +527,51 @@ void Map_Show()
 	glTexCoordPointer(2, GL_FLOAT, 0, plantUV);
 	glColor3f(0.7, 0.7, 0.7);
 	glNormal3f(0, 0, 1);
+	selectMasCnt = 0;
+	int selectColor = 1;
 	for (int i = 0; i < plantCnt; i++)
 	{
+		if (selectMode)
+		{
+			if ((plantMas[i].type == tex_tree) || (plantMas[i].type == tex_tree2))
+				continue;
+
+			static int radious = 3;
+			if ((plantMas[i].x > camera::camera.x - radious)
+				&& (plantMas[i].x < camera::camera.x + radious)
+				&& (plantMas[i].y > camera::camera.y - radious)
+				&& (plantMas[i].y < camera::camera.y + radious))
+			{ 
+				
+				glColor3ub(selectColor, 0, 0);
+				selectMas[selectMasCnt].colorIndex = selectColor;
+				selectMas[selectMasCnt].plantMas_Index = i;
+				selectMasCnt++;
+				selectColor++;
+				if (selectColor >= 255)
+					break;
+
+			}
+			else 
+				continue;
+		}
+
 		glBindTexture(GL_TEXTURE_2D, plantMas[i].type);
-		glPushMatrix();
+		  glPushMatrix();
 		glTranslatef(plantMas[i].x, plantMas[i].y, plantMas[i].z);
 		glScalef(plantMas[i].scale, plantMas[i].scale,plantMas[i].scale);
 		glDrawElements(GL_TRIANGLES, plantIndCnt, GL_UNSIGNED_INT, plantInd);
-		glPopMatrix();
+		   glPopMatrix();
 	}
 	glDisableClientState(GL_VERTEX_ARRAY);
 	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
 
-
-	for (int i = 0; i < treeCNt; i++)
+	if (!selectMode)
 	{
-		Tree_Show(*tree);
+		for (int i = 0; i < treeCNt; i++)
+		{
+			Tree_Show(tree[i]);
+		}
 	}
 
 	glPopMatrix();
@@ -385,14 +582,25 @@ void Map_Show()
 void WndResize(int x,int y)
 {
 	glViewport(0, 0, x, y);
-	float k = x / (float)y;
-	float sz = 0.1;
+	scrSize.x = x;
+	scrSize.y = y;
+	scrKoef = x / (float)y;
+}
 
+
+void Menu_Show()
+{
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
-	glFrustum(-k * sz, k * sz, -sz, sz, sz * 2, 100);
+	glOrtho(0, scrSize.x, scrSize.y, 0, -1, 1);
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
+
+	glDisable(GL_LIGHTING);
+	glDisable(GL_DEPTH_TEST);
+
+	Bag_Show(10,10,50);
+	Health_Show(10,70,30);
 }
 
 int WINAPI WinMain(HINSTANCE hInstance,
@@ -441,7 +649,7 @@ int WINAPI WinMain(HINSTANCE hInstance,
 		NULL);
 
 	ShowWindow(hwnd, nCmdShow);
-
+	SetCursor(wcex.hCursor);
 	/* enable OpenGL for the window */
 	EnableOpenGL(hwnd, &hDC, &hRC);
 
@@ -471,6 +679,7 @@ int WINAPI WinMain(HINSTANCE hInstance,
 		{
 			
 			Map_Show();
+			Menu_Show();
 
 			SwapBuffers(hDC);
 
@@ -494,7 +703,16 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	case WM_CLOSE:
 		PostQuitMessage(0);
 		break;
+	case WM_LBUTTONDOWN:
+		if (mouseBind)
+			Player_Take(hwnd);
+		else
+			Bag_Click(10, 10, 50, LOWORD(lParam), HIWORD(lParam));
+		break;
 
+	case WM_SETCURSOR:
+		ShowCursor(!mouseBind);
+		break;
 	case WM_DESTROY:
 		return 0;
 	case WM_SIZE:
@@ -507,6 +725,13 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		{
 		case VK_ESCAPE:
 			PostQuitMessage(0);
+			break;
+		case 'E':
+			mouseBind = !mouseBind;
+			if (mouseBind)
+				while (ShowCursor(FALSE) >= 0);
+			else
+				while (ShowCursor(TRUE) <= 0);
 			break;
 		}
 	}

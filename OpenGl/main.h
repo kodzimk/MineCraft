@@ -70,6 +70,34 @@ namespace camera
 
 	}
 }
+#define OBjectListCnt 25
+
+typedef struct
+{
+	int plantMas_Index;
+	int colorIndex;
+}TSelectObj;
+TSelectObj selectMas[OBjectListCnt];
+int selectMasCnt = 0;
+BOOL selectMode = FALSE;
+
+POINT scrSize;
+float scrKoef;
+
+typedef struct
+{
+	int type;
+}TSlot;
+#define  bagSize 16
+TSlot bag[bagSize];
+
+float bagRect[] = { 0,0,1,0,1,1,0,1 };
+float bagRectUV[] = { 0,0,1,0,1,1,0,1 };
+
+
+
+
+
 
 float sun[] = {
 	-1,-1,0, 1,-1,0,1,1,0,-1,1,0
@@ -104,6 +132,15 @@ typedef struct
 
 }TobjGroup;
 
+
+typedef struct
+{
+	TObject* obj;
+	float dx, dy, dz;
+	int cnt;
+}TAnim;
+TAnim animation = { 0,0,0,0,0 };
+
 #define mapW 100
 #define mapH 100
 
@@ -124,10 +161,17 @@ int plantIndCnt = sizeof(plantInd) / sizeof(GLuint);
 GLuint mapind[mapW - 1][mapH - 1][6];
 int mapIndCount = sizeof(mapind) / sizeof(GLuint);
 
+
+int health = 15;
+int healthMax = 20;
+
+float heart[] = { 0.5,0.25, 0.25,0, 0,0.25, 0.5,1, 1,0.25,0.75,0 };
 TObject *plantMas = NULL;
 int plantCnt = 0;
 
 int tex_wood;
+
+BOOL mouseBind = TRUE;
 
 float cube[] = {
 	0,0,0, 1,0,0, 1,1,0, 0,1,0,
