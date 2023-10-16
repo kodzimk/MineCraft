@@ -16,11 +16,26 @@ void DisableOpenGL(HWND, HDC, HGLRC);
 
 
 
-
+BOOL IsPointSlot(TSlot slot, int x, int y)
+{
+	return ((x > slot.x) && (x < slot.x + slot.width)
+		&& (y > slot.y) && (y < slot.y + slot.height));
+}
 
 BOOL IsCoordInMap(float x, float y)
 {
 	return (x >= 0) && (x < mapW) && (y >= 0) && (y < mapH);
+}
+
+
+void Recipe_Add(int items[3][3], int itemOut)
+{
+	recipeCnt++;
+	recipe = (TRecipe*)realloc(recipe, sizeof(TRecipe) * recipeCnt);
+	for (int i = 0; i < 3; i++)
+		for (int j = 0; j < 3; j++)
+			recipe[recipeCnt - 1].items[i][j] = items[i][j];
+	recipe[recipeCnt - 1].itemOut = itemOut;
 }
 
 float Map_GetHeight(float x, float y)
@@ -197,7 +212,7 @@ void Anim_Move(TAnim* anim)
 			int i;
 			for ( i = 0; i < bagSize; i++)
 			{
-				if (bag[i].type < 0) {
+				if (bag[i].type <= 0) {
 					bag[i].type = anim->obj->type;
 					break;
 				}
@@ -317,11 +332,39 @@ void Cross_Show()
 	glDisableClientState(GL_VERTEX_ARRAY);
 }
 
+void Game_Create()
+{
+	memset(&craft_menu, 9, sizeof(craft_menu));
+	craft_menu.show = TRUE;
+
+}
+
+void Recipe_Check()
+{
+	for (int k = 0; k < recipeCnt; k++)
+	{
+		BOOL checkOk = TRUE;
+		for (int i = 0; i < 3; i++)
+		{
+			for (int j = 0; j < 3; j++)
+				if (craft_menu.items[i][j].type != recipe[k].items[i][j])
+					checkOk = FALSE;
+			if (checkOk)
+			{
+				craft_menu.itemOut.type = recipe[k].itemOut;
+				break;
+			}
+			else
+				craft_menu.itemOut.type = 0;
+		}
+	}
+}
+
 void Map_Init()
 {
 	for (int i = 0; i < bagSize; i++)
 	{
-		bag[i].type = -1;
+		bag[i].type = 0;
 	}
 
 	LoadTexture("textures/pole.png", &tex_pole);
@@ -333,6 +376,17 @@ void Map_Init()
 	LoadTexture("textures/tree2.png", &tex_tree2);
 	LoadTexture("textures/wood.png", &tex_wood);
 
+	LoadTexture("textures/mortar.png", &tex_ico_mertar);
+	LoadTexture("textures/potion_eye.png", &tex_ico_poison_eye);
+	LoadTexture("textures/potion_speed.png", &tex_ico_potion_speed);
+	LoadTexture("textures/potion_life.png", &tex_ico_potion_life);
+
+	int a[3][3] = { tex_flower2, tex_flower2,      tex_flower2,
+							 0, 0, 0,
+							 tex_flower2, tex_flower2,tex_flower2 };
+
+	Recipe_Add(a,tex_ico_poison_eye);
+		
 	glEnable(GL_LIGHTING);
 	glEnable(GL_LIGHT0);
 	glEnable(GL_COLOR_MATERIAL);
@@ -472,6 +526,51 @@ void Map_Proc()
 			PostQuitMessage(0);
 	}
 }
+
+void CraftMenu_Click(int mx, int my, int button)
+{
+	if ((!craft_menu.show) || (button != WM_LBUTTONDOWN))return;
+	for (int i = 0; i < 3; i++)
+		for (int j = 0; j < 3; j++)
+			if (IsPointSlot(craft_menu.items[i][j], mx, my))
+			{
+				int type = handItemType;
+				handItemType = craft_menu.items[i][j].type;
+				craft_menu.items[i][j].type = type;
+				if (craft_menu.items[i][j].type <= 0)
+					craft_menu.items[i][j].type = 0;
+			}
+
+	if (IsPointSlot(craft_menu.itemOut, mx, my)
+		&& (handItemType <= 0)
+		&& (craft_menu.itemOut.type > 0))
+	{
+		handItemType = craft_menu.itemOut.type;
+		for (int i = 0; i < 3; i++)
+			for (int j = 0; j < 3; j++)
+				craft_menu.items[i][j].type = 0;
+	}
+	Recipe_Check();
+}
+
+void CraftMenu_Show()
+{
+	if (!craft_menu.show)return;
+	Cell_Show(craft_menu.x, craft_menu.y, craft_menu.width, craft_menu.height, 0);
+	for (int i = 0; i < 3; i++)
+		for (int j = 0; j < 3; j++)
+			Cell_Show(craft_menu.items[i][j].x,
+				craft_menu.items[i][j].y,
+				craft_menu.items[i][j].width,
+				craft_menu.items[i][j].height,
+				craft_menu.items[i][j].type);
+
+	Cell_Show(craft_menu.itemOut.x,
+		craft_menu.itemOut.y,
+		craft_menu.itemOut.width,
+		craft_menu.itemOut.height,
+		craft_menu.itemOut.type);
+} 
 
 void Map_Show()
 {
@@ -631,12 +730,37 @@ void Map_Show()
 	
 }
 
+void CraftMenu_Resize(int scale)
+{
+	craft_menu.width = scale * 6;
+	craft_menu.height = scale * 4;
+	craft_menu.x = (scrSize.x - craft_menu.width) * 0.5;
+	craft_menu.y = (scrSize.x - craft_menu.height) * 0.5;
+	int scael05 = scale * 0.5;
+	for (int i = 0; i < 3; i++)
+	{
+		for (int j = 0; j < 3; j++)
+		{
+			craft_menu.items[i][j].x = craft_menu.x + scael05 + i * scale; 
+			craft_menu.items[i][j].y = craft_menu.y + scael05 + j * scale;
+			craft_menu.items[i][j].width =scale;
+			craft_menu.items[i][j].height = scale;
+		}
+	}
+	craft_menu.itemOut.x = craft_menu.x + scael05 + 4 * scale;
+	craft_menu.itemOut.y = craft_menu.y + scael05 + 1 * scale;
+	craft_menu.itemOut.width = scale;
+	craft_menu.itemOut.height =scale;
+}
+
 void WndResize(int x,int y)
 {
 	glViewport(0, 0, x, y);
 	scrSize.x = x;
 	scrSize.y = y;
 	scrKoef = x / (float)y;
+
+	CraftMenu_Resize(50);
 }
 
 
@@ -655,6 +779,7 @@ void Menu_Show()
 	Health_Show(10,70,30);
 	Cross_Show();
 	HandIyem_Show();
+	CraftMenu_Show();
 }
 
 int WINAPI WinMain(HINSTANCE hInstance,
@@ -757,6 +882,9 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
 	switch (uMsg)
 	{
+	case WM_CREATE:
+		Game_Create();
+		break;
 	case WM_CLOSE:
 		PostQuitMessage(0);
 		break;
@@ -765,7 +893,10 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		if (mouseBind)
 			Player_Take(hwnd);
 		else
-			Bag_Click(10, 10, 50, LOWORD(lParam), HIWORD(lParam),uMsg);
+		{
+			Bag_Click(10, 10, 50, LOWORD(lParam), HIWORD(lParam), uMsg);
+			CraftMenu_Click(LOWORD(lParam), HIWORD(lParam), uMsg);
+		}
 		break;
 
 	case WM_SETCURSOR:

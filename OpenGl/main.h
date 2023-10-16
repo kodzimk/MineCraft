@@ -87,6 +87,8 @@ float scrKoef;
 typedef struct
 {
 	int type;
+	int x, y;
+	int width, height;
 }TSlot;
 #define  bagSize 16
 TSlot bag[bagSize];
@@ -174,6 +176,7 @@ int tex_wood;
 BOOL mouseBind = TRUE;
 int handItemType = 0;
 POINT mousePos;
+int tex_ico_mertar, tex_ico_poison_eye, tex_ico_potion_speed, tex_ico_potion_life;
 
 float cube[] = {
 	0,0,0, 1,0,0, 1,1,0, 0,1,0,
@@ -181,6 +184,14 @@ float cube[] = {
 	0,0,0, 1,0,0, 1,1,0, 0,1,0,
 	0,0,1, 1,0,1, 1,1,1, 0,1,1
 };
+
+struct {
+	int x, y;
+	int width, height;
+	TSlot items[3][3];
+	TSlot itemOut;
+	BOOL show;
+}craft_menu;
 
 float cubeUVLog[] = {0.5,0.5, 1,0.5, 1,0, 0.5,0,
                      0.5,0.5, 1,0.5, 1,0, 0.5,0,
@@ -201,6 +212,15 @@ int cubeInCnt = sizeof(cubeInd) / sizeof(GLuint);
 
 TobjGroup* tree = NULL;
 int treeCNt = 0;
+
+
+typedef struct
+{
+	int items[3][3];
+	int itemOut;
+}TRecipe;
+TRecipe* recipe;
+int recipeCnt;
 
 int tex_pole, tex_trava, tex_flower, tex_flower2, tex_grib, tex_tree, tex_tree2;
 
